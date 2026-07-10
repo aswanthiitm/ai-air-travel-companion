@@ -82,6 +82,7 @@ user_id + free-text request
 | Fact | Consequence |
 |---|---|
 | Median route has ~38 flights over 18 months | All searches are date-*windowed*, never exact-date |
+| Routes cluster into disjoint months (e.g. CPT→NRT has zero flights May–Aug 2025; MEL→JFK and JFK→MEL barely overlap) | Date widening is a first-class relaxation; multi-leg assembly needs backward feasibility propagation + date-diverse beams |
 | 18 OD pairs missing | Multi-city visit order is a real optimization variable |
 | LIS→SYD has zero direct flights, but U05 demands direct + ≤90min layover | Relaxation ladder is mandatory (benchmark B05 trap) |
 | `demand_level`/`is_holiday_season` fully determined by `season` | `season` is canonical; others are display denormalizations |
@@ -120,25 +121,39 @@ the current ask always outranks history. The inference engine consumes the
 profile read-only via `profile.hard`, `profile.weights`,
 `profile.flexibility`; it never touches raw user data.
 
-## Recommendation engine (design)
+## Recommendation engine (implemented)
 
-1. **Hard filters:** origin, destination(s), date window, seats ≥ party,
-   layovers ≤ max.
-2. **Relaxation ladder** when empty: drop airline filter → widen dates →
-   raise layover cap → allow more stops. Each step is recorded and becomes
-   an explanation sentence ("honest negotiation").
-3. **Scoring:** `Σ wᵢ · componentᵢ` over price, duration, convenience
-   (stops, layover fit, dep-time fit, OTP), comfort (cabin, bags,
-   refundable), loyalty — weights derived from the profile, normalized
-   against the candidate set.
-4. **Trade-off surfacing is structural:** top pick + named alternatives
-   (cheapest / fastest / most convenient) with computed deltas, priced in
-   the traveler's value-of-time where available.
-5. **Multi-city:** permute visit order (pruned by OD existence), beam search
-   over per-leg top-k with feasibility (arrival + min stay ≤ next
-   departure), score the chain.
-6. **Season & scarcity annotations** on every result (route seasonal uplift,
-   seats ≤ 3).
+1. **Hard filters:** route, date window, seats ≥ party, minimum-connection
+   floor (never relaxed — it protects the traveler), cabin floor for
+   strict-cabin travelers ("first or business only" ⇒ floor is Business).
+2. **Two-level relaxation ladder** when nothing satisfies the traveler:
+   *inner* = preference concessions in priority order (airlines → +stops →
+   layover cap ×2 → uncapped → longer city stays → weekday pattern → cabin
+   floor); *outer* = date-window widening (±2w → ±6w → full horizon).
+   Trying the asked dates with relaxed preferences *before* moving dates
+   keeps concessions minimal. For multi-city, a final **open-jaw pass**
+   (skip the homebound leg) beats returning INFEASIBLE.
+3. **Post-hoc concession audit:** the ladder is linear, so the winning
+   search state may be more relaxed than the winner needs. The reported
+   concessions are recomputed from what the top itinerary *actually*
+   violates, with concrete numbers ("accepted a 110-minute layover, above
+   the usual 90-minute cap").
+4. **Scoring:** `Σ wᵢ · componentᵢ` over price, duration, convenience
+   (stops, layover, departure-time fit, redeye, OTP, distance from asked
+   dates), comfort (cabin distance, baggage, refundability for business),
+   loyalty (preferred airline / same alliance) — weights from the profile.
+5. **Multi-city assembly:** permute visit order (pruned by OD existence),
+   then **backward feasibility propagation** — per-leg pools are pruned,
+   last leg first, to exactly the flights from which the rest of the chain
+   can still be completed. The forward beam (date-diverse picks, so sparse
+   clustered routes don't collapse the beam onto one departure date) then
+   only optimizes among provably completable chains: if any chain exists,
+   one is found.
+6. **Trade-off surfacing is structural:** top pick + named alternatives
+   (cheapest / fastest / most convenient) with computed deltas and
+   **Worth-It math** against the traveler's revealed value of time.
+7. **Season & scarcity annotations** on every leg (route seasonal uplift vs
+   shoulder baseline, holiday flag, seats ≤ 3, redeye).
 
 ## UI (design — later milestone)
 
