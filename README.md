@@ -40,7 +40,7 @@ src/           Deterministic Python backend
   airports.py          Static reference for the 35 airports (tz offsets, coords)
   data_loader.py       Typed CSV/JSON loaders
   preprocessing.py     Enrichment, route indices, seasonal stats, validation
-ui/            React frontend (later milestone)
+ui/            React flight-deck (Vite): Twin / Reasoning / Verdict panels
 docs/          Architecture and design documentation
 notebooks/     Exploration notebooks
 tests/         Pytest suite — dataset invariants + module contracts
@@ -58,6 +58,19 @@ python -m src.evaluation --report   # + regenerate docs/BENCHMARKS.md
 
 Requires Python 3.10+. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the
 full benchmark output with per-prompt rubric self-checks.
+
+### Run the flight-deck UI
+
+```bash
+python3 -m uvicorn src.api:app --port 8010     # backend API
+cd ui && npm install && npm run dev            # frontend on :5173 (proxies /api)
+```
+
+Pick a traveler, ask in plain language (or click a benchmark chip), and watch
+the three panels: **The Twin** (evidence-backed profile with steerable
+decision weights), **The Reasoning** (request resolution, the search funnel,
+honest concessions), **The Verdict** (top pick + named alternatives with
+Worth-It math, scarcity and holiday badges).
 
 ## Assumptions
 
@@ -92,7 +105,8 @@ Documented as they are made (hackathon FAQ #6):
 | 3 | Request parsing + inference engine | ✅ done |
 | 4 | Recommendation engine (filters, relaxation, scoring, multi-city) | ✅ done |
 | 5 | Explanation engine + benchmark runner | ✅ done |
-| 6 | FastAPI layer + React UI (flight-deck) | ⏳ next |
+| 6a | FastAPI layer + React flight-deck with working data flow | ✅ done |
+| 6b | Visual polish (Traveler DNA, funnel animation, route map) | ⏳ next |
 
 ## Limitations & future work
 
