@@ -51,10 +51,13 @@ tests/         Pytest suite — dataset invariants + module contracts
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pytest            # verifies dataset invariants + module contracts
+pytest                              # dataset invariants + module contracts
+python -m src.evaluation            # run all 6 benchmark prompts end-to-end
+python -m src.evaluation --report   # + regenerate docs/BENCHMARKS.md
 ```
 
-Requires Python 3.10+.
+Requires Python 3.10+. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the
+full benchmark output with per-prompt rubric self-checks.
 
 ## Assumptions
 
@@ -88,8 +91,8 @@ Documented as they are made (hackathon FAQ #6):
 | 2 | Preference extraction → Traveler Profile | ✅ done |
 | 3 | Request parsing + inference engine | ✅ done |
 | 4 | Recommendation engine (filters, relaxation, scoring, multi-city) | ✅ done |
-| 5 | Explanation engine + benchmark runner | ⏳ next |
-| 6 | FastAPI layer + React UI (flight-deck) | — |
+| 5 | Explanation engine + benchmark runner | ✅ done |
+| 6 | FastAPI layer + React UI (flight-deck) | ⏳ next |
 
 ## Limitations & future work
 
