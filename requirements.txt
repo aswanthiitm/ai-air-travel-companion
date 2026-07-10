@@ -1,0 +1,3 @@
+# Backend (Milestone 1). UI/API dependencies are added when those milestones land.
+pandas>=2.2
+pytest>=8.0
