@@ -80,6 +80,29 @@ CITY_ALIASES: dict[str, str] = {
 }
 
 
+# Region pools for requests like "plan a multi-city Asia trip" that name a
+# region instead of cities. Middle East kept separate from Asia deliberately.
+REGIONS: dict[str, set[str]] = {
+    "asia": {"BKK", "BOM", "DEL", "DPS", "HKG", "ICN", "KUL", "MAA", "NRT", "PEK", "PVG", "SIN"},
+    "middle_east": {"DOH", "DXB"},
+    "europe": {"AMS", "BCN", "CDG", "FCO", "FRA", "IST", "LHR", "LIS", "SVO"},
+    "oceania": {"AKL", "MEL", "SYD"},
+    "africa": {"CPT"},
+    "americas": {"GIG", "GRU", "JFK", "LAX", "MEX", "ORD", "SFO", "YYZ"},
+}
+
+REGION_ALIASES: dict[str, str] = {
+    "asia": "asia",
+    "europe": "europe",
+    "euro": "europe",
+    "middle east": "middle_east",
+    "oceania": "oceania",
+    "africa": "africa",
+    "americas": "americas",
+    "america": "americas",
+}
+
+
 def resolve_city(name: str) -> str | None:
     """Resolve a city name or IATA code to an IATA code, else None."""
     key = name.strip().lower()

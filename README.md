@@ -86,8 +86,8 @@ Documented as they are made (hackathon FAQ #6):
 |---|---|---|
 | 1 | Scaffold, data loading, preprocessing, validation | ✅ done |
 | 2 | Preference extraction → Traveler Profile | ✅ done |
-| 3 | Request parsing + inference engine | ⏳ next |
-| 4 | Recommendation engine (filters, relaxation, scoring, multi-city) | — |
+| 3 | Request parsing + inference engine | ✅ done |
+| 4 | Recommendation engine (filters, relaxation, scoring, multi-city) | ⏳ next |
 | 5 | Explanation engine + benchmark runner | — |
 | 6 | FastAPI layer + React UI (flight-deck) | — |
 

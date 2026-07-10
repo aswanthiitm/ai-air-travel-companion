@@ -67,6 +67,16 @@ class Weights:
         return {"price": self.price, "time": self.time, "convenience": self.convenience,
                 "comfort": self.comfort, "loyalty": self.loyalty}
 
+    def adjusted(self, **deltas: float) -> "Weights":
+        """New normalized Weights with deltas applied (floors at 0).
+
+        Used when request-level signals outrank the stored profile, e.g.
+        an explicit "cheapest" bumps price before re-normalizing.
+        """
+        raw = {k: max(0.0, v + deltas.get(k, 0.0)) for k, v in self.as_dict().items()}
+        total = sum(raw.values())
+        return Weights(**{k: round(v / total, 3) for k, v in raw.items()})
+
 
 @dataclass
 class Flexibility:
