@@ -16,3 +16,6 @@ ui/dist/
 
 # Notebooks
 .ipynb_checkpoints/
+
+# Office temp/lock files
+.~*
