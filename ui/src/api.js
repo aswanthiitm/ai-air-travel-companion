@@ -8,6 +8,7 @@ async function request(path, options) {
 }
 
 export const getUsers = () => request("/api/users");
+export const getAirports = () => request("/api/airports");
 export const getProfile = (userId) => request(`/api/profile/${userId}`);
 export const getBenchmarks = () => request("/api/benchmarks");
 export const postRecommend = (body) =>

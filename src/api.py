@@ -197,6 +197,13 @@ def get_profile(user_id: str) -> dict:
     return _profile_json(profiles[user_id])
 
 
+@app.get("/api/airports")
+def list_airports() -> dict[str, dict]:
+    from .airports import AIRPORTS
+    return {a.iata: {"city": a.city, "country": a.country, "lat": a.lat, "lon": a.lon}
+            for a in AIRPORTS.values()}
+
+
 @app.get("/api/benchmarks")
 def list_benchmarks() -> list[dict]:
     return [{"prompt_id": b["prompt_id"], "user_id": b["user_id"], "request": b["request"]}

@@ -31,6 +31,12 @@ def test_benchmarks_endpoint(client):
     assert len(client.get("/api/benchmarks").json()) == 6
 
 
+def test_airports_endpoint(client):
+    airports = client.get("/api/airports").json()
+    assert len(airports) == 35
+    assert {"city", "lat", "lon"} <= set(airports["NRT"])
+
+
 def test_recommend_b05_full_payload(client):
     r = client.post("/api/recommend",
                     json={"user_id": "U05",

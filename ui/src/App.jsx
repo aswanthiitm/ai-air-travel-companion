@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getBenchmarks, getProfile, getUsers, postRecommend } from "./api.js";
+import { getAirports, getBenchmarks, getProfile, getUsers, postRecommend } from "./api.js";
 import TwinPanel from "./panels/TwinPanel.jsx";
 import ReasoningPanel from "./panels/ReasoningPanel.jsx";
 import VerdictPanel from "./panels/VerdictPanel.jsx";
@@ -7,6 +7,7 @@ import VerdictPanel from "./panels/VerdictPanel.jsx";
 export default function App() {
   const [users, setUsers] = useState([]);
   const [benchmarks, setBenchmarks] = useState([]);
+  const [airports, setAirports] = useState(null);
   const [userId, setUserId] = useState("");
   const [profile, setProfile] = useState(null);
   const [request, setRequest] = useState("");
@@ -18,6 +19,7 @@ export default function App() {
   useEffect(() => {
     getUsers().then(setUsers).catch((e) => setError(e.message));
     getBenchmarks().then(setBenchmarks).catch(() => {});
+    getAirports().then(setAirports).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -102,7 +104,7 @@ export default function App() {
           onWeightsChange={setWeights}
           onRerun={() => run(weights)}
         />
-        <ReasoningPanel result={result} loading={loading} error={error} />
+        <ReasoningPanel result={result} loading={loading} error={error} airports={airports} />
         <VerdictPanel result={result} />
       </main>
     </>

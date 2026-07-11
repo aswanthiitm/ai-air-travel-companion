@@ -106,7 +106,7 @@ Documented as they are made (hackathon FAQ #6):
 | 4 | Recommendation engine (filters, relaxation, scoring, multi-city) | ✅ done |
 | 5 | Explanation engine + benchmark runner | ✅ done |
 | 6a | FastAPI layer + React flight-deck with working data flow | ✅ done |
-| 6b | Visual polish (Traveler DNA, funnel animation, route map) | ⏳ next |
+| 6b | Visual polish (Traveler DNA dial, route map, funnel animation, boarding passes) | ✅ done |
 
 ## Limitations & future work
 

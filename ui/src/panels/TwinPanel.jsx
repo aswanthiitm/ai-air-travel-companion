@@ -1,4 +1,5 @@
 import React from "react";
+import TravelerDNA from "./TravelerDNA.jsx";
 
 const WEIGHT_KEYS = ["price", "time", "convenience", "comfort", "loyalty"];
 
@@ -15,6 +16,12 @@ export default function TwinPanel({ profile, weights, onWeightsChange, onRerun }
         {profile.home_city} ({profile.home_airport}) · {profile.trip_purpose} traveler
         {profile.party.children > 0 && ` · ${profile.party.children} kid(s)`}
       </p>
+
+      <TravelerDNA
+        weights={Object.fromEntries(
+          Object.entries(profile.weights).map(([k, v]) => [k, weights?.[k] ?? v]))}
+        userId={profile.user_id}
+      />
 
       <h3>Decision weights (drag to steer)</h3>
       {WEIGHT_KEYS.map((k) => (
