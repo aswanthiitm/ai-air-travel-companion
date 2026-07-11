@@ -41,6 +41,7 @@ class TripSpec:
     destination_names: list[str] = field(default_factory=list)  # in mention order
     region: str | None = None
     date_phrase: DatePhrase | None = None
+    explicit_window: tuple | None = None  # (date, date) from form fields; outranks phrase
     round_trip: bool = False
     multi_city: bool = False
     advise_only: bool = False  # "what should I expect" -> lead with expectations

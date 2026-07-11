@@ -66,6 +66,11 @@ class ResolvedTrip:
 
 def _resolve_window(spec: TripSpec, profile: TravelerProfile, now: date,
                     notes: list[str]) -> DateWindow:
+    if spec.explicit_window is not None:
+        start, end = spec.explicit_window
+        window = DateWindow(max(start, now + timedelta(days=1)), end)
+        notes.append(f"dates taken from the form: {window}")
+        return window
     phrase = spec.date_phrase
     if phrase is None:
         width = max(DEFAULT_WINDOW_DAYS, 2 * profile.flexibility.date_flexibility_days)
