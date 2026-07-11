@@ -11,7 +11,8 @@ for the explanation engine and the UI's Traveler DNA panel.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from statistics import median
 
 import pandas as pd
 
@@ -293,3 +294,88 @@ def build_profile(user: pd.Series) -> TravelerProfile:
 def build_all_profiles(users: pd.DataFrame) -> dict[str, TravelerProfile]:
     """Profiles for every parsed user row, keyed by user_id."""
     return {row["user_id"]: build_profile(row) for _, row in users.iterrows()}
+
+
+# ---------------------------------------------------------------------------
+# Living Twin merge: baseline ⊕ learned overlay → the SAME TravelerProfile
+# dataclass the engine consumes. Pure function; the engine never knows.
+# The `overlay` is twin_store.Overlay-shaped (duck-typed here to avoid a
+# circular import): .dims, .weight_bias, .vot_obs, .airlines_seen, .flips.
+# ---------------------------------------------------------------------------
+
+_ACT_THRESHOLD = 0.5  # beliefs below this are recorded but not yet acted on
+_BEHAVIOR_STOPS = {"avoid": 0, "limit_1": 1, "accept": 2}
+
+
+def apply_overlay(profile: TravelerProfile, overlay) -> TravelerProfile:
+    if not (overlay.dims or overlay.weight_bias or overlay.vot_obs
+            or overlay.airlines_seen or overlay.flips):
+        return profile
+
+    signals = list(profile.signals)
+    conflicts = list(profile.conflicts)
+    soft = replace(profile.soft, airlines=list(profile.soft.airlines))
+    weights = profile.weights
+    rationale = list(profile.weight_rationale)
+    flexibility = profile.flexibility
+
+    for dim, st in overlay.dims.items():
+        evidence = "; ".join(st["receipts"][-2:])
+        signals.append(PreferenceSignal(dim, st["value"], Source.BEHAVIOR,
+                                        evidence, st["c"]))
+        if st["c"] < _ACT_THRESHOLD:
+            continue
+        v, c = st["value"], st["c"]
+        if dim == "redeye" and v in ("avoid", "accept"):
+            soft.redeye_policy = v
+        elif dim == "stops" and v in _BEHAVIOR_STOPS:
+            soft.max_stops = (min(soft.max_stops, _BEHAVIOR_STOPS[v]) if v == "avoid"
+                              else max(soft.max_stops, _BEHAVIOR_STOPS[v]))
+        elif dim == "layover_tolerance":
+            soft.layover_tolerance = v
+        elif dim == "departure_time":
+            if v in ("morning", "evening"):
+                soft.departure_time = v
+            elif v == "later" and soft.departure_time == "morning":
+                soft.departure_time = None
+                rationale.append("dropped morning-departure bias: repeated "
+                                 f"'too early' feedback ({evidence})")
+        elif dim == "budget":
+            if v == "minimize":
+                weights = weights.adjusted(price=+0.15 * c)
+                rationale.append(f"price +{0.15 * c:.2f}: learned cost-minimizing "
+                                 f"behavior ({evidence})")
+            elif v == "unconstrained":
+                weights = weights.adjusted(price=-0.10 * c, comfort=+0.10 * c)
+                rationale.append(f"comfort over price (learned: {evidence})")
+
+    for airline, n in overlay.airlines_seen.items():
+        if n >= 2 and airline not in soft.airlines:
+            soft.airlines.append(airline)
+            signals.append(PreferenceSignal(
+                "airlines", airline, Source.BEHAVIOR,
+                f"chosen {n} times in live interactions", min(0.9, 0.3 * n)))
+
+    if overlay.weight_bias:
+        weights = weights.adjusted(**overlay.weight_bias)
+        rationale.append("weights nudged by remembered slider steers: "
+                         + ", ".join(f"{k} {v:+.2f}" for k, v in overlay.weight_bias.items()))
+
+    if overlay.vot_obs:
+        baseline_vot = profile.flexibility.value_of_time_usd_per_hr
+        observations = ([baseline_vot] if baseline_vot else []) + list(overlay.vot_obs)
+        flexibility = replace(flexibility,
+                              value_of_time_usd_per_hr=round(median(observations), 2))
+
+    for flip in overlay.flips:
+        kept = PreferenceSignal(flip["dim"], flip["new"], Source.BEHAVIOR,
+                                flip["evidence"], 0.5)
+        discarded = PreferenceSignal(flip["dim"], flip["old"], Source.RAW_HISTORY,
+                                     "previous belief (baseline or earlier events)", 0.4)
+        conflicts.append(Conflict(
+            flip["dim"], kept=kept, discarded=discarded,
+            reason=f"live behavior contradicted the earlier belief "
+                   f"({flip['old']} → {flip['new']}: {flip['evidence']})"))
+
+    return replace(profile, signals=signals, conflicts=conflicts, soft=soft,
+                   weights=weights, weight_rationale=rationale, flexibility=flexibility)

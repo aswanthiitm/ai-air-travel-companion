@@ -25,6 +25,8 @@ class Source(Enum):
     STRUCTURED_FIELD = "structured_field"
     RAW_HISTORY = "raw_history"
     REQUEST = "request"
+    FEEDBACK = "feedback"    # stated in a live interaction ("too early for me")
+    BEHAVIOR = "behavior"    # derived from accept/reject/booking patterns
 
 
 @dataclass(frozen=True)
@@ -125,7 +127,14 @@ LEXICON: list[Rule] = [
     _rule("value_of_time", r"(\d+)\s*hr layover in [a-z]{3} to save \$(\d+)",
           lambda m: round(int(m.group(2)) / int(m.group(1)), 2), 0.8),
     _rule("layover_tolerance", r"overnight layovers|layover in [a-z]{3} to save", "high"),
-    _rule("layover_tolerance", r"skip a \d+\s*hr layover", "avoid_long"),
+    _rule("layover_tolerance", r"skip a \d+\s*hr layover|hate long layovers|"
+                               r"long layovers? stress|avoid long layovers", "avoid_long"),
+    # live-feedback phrasings (the corpus never uses these; travelers do)
+    _rule("redeye", r"(don'?t like|hate|avoid|no) overnight flight", "avoid", 0.8),
+    _rule("budget", r"pay(ing)? extra for comfort|money is no object", "unconstrained", 0.8),
+    _rule("occasion", r"honeymoon|anniversary|babymoon", "special", 0.8),
+    _rule("departure_time", r"too early in the morning|not (so|too) early|later in the day",
+          "later", 0.7),
     # date flexibility
     _rule("dates", r"flexible dates|dates are flexible|date flexibility|super flexible|whole summer free"
                    r"|weeks of window", "flexible"),
