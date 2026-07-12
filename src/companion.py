@@ -41,9 +41,11 @@ def compose(bundle: EvidenceBundle, explanation: Explanation,
     try:
         reply = llm.invoke([
             ("system", _SYSTEM),
-            ("user", json.dumps(bundle.as_dict(), default=str)),
+            ("user", json.dumps(bundle.companion_view(), default=str)),
         ])
         text = reply.content if isinstance(reply.content, str) else str(reply.content)
+        if not text.strip():  # reasoning models can burn the budget and say nothing
+            return fallback, False, ["empty model reply"]
         violations = validate_grounding(text, bundle)
         if violations:
             return fallback, False, violations

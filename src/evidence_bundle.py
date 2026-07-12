@@ -50,6 +50,41 @@ class EvidenceBundle:
             "trace": self.trace,
         }
 
+    def companion_view(self) -> dict:
+        """Trimmed bundle for the Companion's prompt.
+
+        The full ranked pool (20 itineraries x legs) exists for the UI and
+        the grounding index, but drowning a token-budgeted model in it
+        starves the actual reply. The Companion gets exactly what it may
+        talk about: the decision, the alternatives, the reasoning, and the
+        Twin's evidence. Grounding is still validated against the FULL
+        bundle, so nothing here loosens the anti-hallucination gate.
+        """
+        rec = self.computation["recommendation"]
+        return {
+            "request_summary": self.request_summary,
+            "reasoning": asdict(self.reasoning),
+            "twin": self.twin,
+            "computation": {
+                "trip": self.computation["trip"],
+                "explanation": self.computation["explanation"],
+                "recommendation": {
+                    "top": rec["top"],
+                    "alternatives": rec["alternatives"],
+                    "relaxations": rec["relaxations"],
+                    "window_used": rec["window_used"],
+                    "feasible": rec["feasible"],
+                },
+            },
+        }
+
+
+def _norm_quote(text: str) -> str:
+    """Punctuation/typography-insensitive form for quote matching."""
+    t = text.strip().lower().replace("’", "'").replace("‘", "'")
+    t = re.sub(r"\s+", " ", t)
+    return t.strip(" .,;:!?…\"'—-")
+
 
 def _collect(value, numbers: set, quotes: set) -> None:
     if isinstance(value, dict):
@@ -64,7 +99,7 @@ def _collect(value, numbers: set, quotes: set) -> None:
         numbers.add(round(float(value), 2))
         numbers.add(float(round(value)))
     elif isinstance(value, str):
-        quotes.add(value.strip().lower())
+        quotes.add(_norm_quote(value))
         for n in re.findall(r"\d[\d,]*(?:\.\d+)?", value):
             try:
                 numbers.add(round(float(n.replace(",", "")), 2))
@@ -125,7 +160,7 @@ def validate_grounding(text: str, bundle: EvidenceBundle) -> list[str]:
                     and float(round(n)) not in bundle.grounding_numbers:
                 violations.append(f"number {raw} not in evidence")
     for quote in re.findall(r'[“"]([^"”]{6,})[”"]', text):
-        q = quote.strip().lower()
-        if not any(q in known for known in bundle.grounding_quotes):
+        q = _norm_quote(quote)
+        if q and not any(q in known for known in bundle.grounding_quotes):
             violations.append(f'quote "{quote}" not in evidence')
     return violations

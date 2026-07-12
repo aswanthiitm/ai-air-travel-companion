@@ -59,9 +59,13 @@ python -m src.evaluation --report   # + regenerate docs/BENCHMARKS.md
 python3 -m uvicorn src.api:app --port 8010
 cd ui && npm install && npm run dev            # http://localhost:5173
 
-# optional agent mode: LLM understanding + composed replies (Groq free tier)
-export GROQ_API_KEY=...                        # without it, the deterministic
-                                               # fallback handles everything
+# optional agent mode: LLM understanding + composed replies.
+# Either provider works; without a key the deterministic fallback handles
+# everything (all benchmarks + tests are offline).
+export GROQ_API_KEY=...          # Groq (llama-3.3-70b-versatile), or
+export OPENROUTER_API_KEY=...    # OpenRouter (default: tencent/hy3:free)
+export TWIN_LLM_MODEL=...        # optional model override
+# live-mode validation: pytest tests/test_llm_live.py (skipped without a key)
 ```
 
 Requires Python 3.10+. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the

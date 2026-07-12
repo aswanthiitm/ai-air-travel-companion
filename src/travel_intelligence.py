@@ -52,15 +52,57 @@ _REQUEST_DIMS = {"budget", "stops", "redeye", "layover_tolerance",
 
 
 def get_llm():
-    """ChatGroq when a key is configured and langchain is importable, else None."""
-    if not os.environ.get("GROQ_API_KEY"):
-        return None
-    try:
-        from langchain_groq import ChatGroq
-        return ChatGroq(model=os.environ.get("TWIN_LLM_MODEL", "llama-3.3-70b-versatile"),
-                        temperature=0.2)
-    except ImportError:
-        return None
+    """The configured chat model, else None (deterministic fallback).
+
+    Providers, by env key: GROQ_API_KEY -> ChatGroq (llama-3.3-70b);
+    OPENROUTER_API_KEY -> ChatOpenAI against openrouter.ai (default model
+    tencent/hy3:free — a reasoning model, so token budgets are generous and
+    reasoning effort is pinned low). Override the model with TWIN_LLM_MODEL.
+    """
+    if os.environ.get("GROQ_API_KEY"):
+        try:
+            from langchain_groq import ChatGroq
+            return ChatGroq(model=os.environ.get("TWIN_LLM_MODEL",
+                                                 "llama-3.3-70b-versatile"),
+                            temperature=0.2)
+        except ImportError:
+            return None
+    if os.environ.get("OPENROUTER_API_KEY"):
+        try:
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                model=os.environ.get("TWIN_LLM_MODEL", "tencent/hy3:free"),
+                api_key=os.environ["OPENROUTER_API_KEY"],
+                base_url="https://openrouter.ai/api/v1",
+                temperature=0.2,
+                max_tokens=6000,  # reasoning models spend tokens thinking first
+                extra_body={"reasoning": {"effort": "low"}},
+            )
+        except ImportError:
+            return None
+    return None
+
+
+def _json_invoke(llm, prompt: str, schema_model):
+    """Portable structured output: ask for pure JSON, parse, validate.
+
+    Free-tier models often lack the OpenAI tools API that
+    `with_structured_output` relies on; a JSON-only instruction plus
+    pydantic validation works across all of them. Any failure raises, and
+    the caller falls back to the rule-based path.
+    """
+    import json as _json
+    import re as _re
+
+    schema = {k: v.get("type", "any")
+              for k, v in schema_model.model_json_schema()["properties"].items()}
+    reply = llm.invoke(prompt + "\n\nReply with ONLY a JSON object, no prose, "
+                                f"with exactly these keys: {_json.dumps(schema)}")
+    text = reply.content if isinstance(reply.content, str) else str(reply.content)
+    match = _re.search(r"\{.*\}", text, _re.S)
+    if not match:
+        raise ValueError(f"no JSON in model reply: {text[:120]!r}")
+    return schema_model.model_validate(_json.loads(match.group(0)))
 
 
 @dataclass
@@ -290,16 +332,19 @@ class TravelIntelligenceAgent:
             f"VALIDATED FACTS — do not re-extract or second-guess them: {known}. "
             f"The traveler's profile: {profile.trip_purpose} traveler from "
             f"{profile.home_city}. Analyze ONLY the free-text message for intent "
-            "and anything the form doesn't cover.\n\nMessage: " + message)
-        out = self.llm.with_structured_output(UnderstandModel).invoke(prompt)
+            "and anything the form doesn't cover. If a destination is already "
+            "known (form or message), intent is SEARCH.\n\nMessage: " + message)
+        out = _json_invoke(self.llm, prompt, UnderstandModel)
 
         und = self._understand_rules(message, slots)  # deterministic floor
         und.intent = out.intent if out.intent in ("SEARCH", "PREFERENCE_UPDATE",
                                                   "ADVICE") else "SEARCH"
-        und.purpose = out.purpose
-        und.round_trip = und.round_trip or out.round_trip
-        und.multi_city = und.multi_city or out.multi_city
-        und.advise_only = und.advise_only or out.advise_only
+        # vocabulary guard: models say things like "honeymoon" here
+        und.purpose = out.purpose if out.purpose in ("business", "leisure",
+                                                     "mixed") else None
+        und.round_trip = und.round_trip or bool(out.round_trip)
+        und.multi_city = und.multi_city or bool(out.multi_city)
+        und.advise_only = und.advise_only or bool(out.advise_only)
         from .airports import resolve_city
         for name in out.destination_names:      # VERIFY: gazetteer or it didn't happen
             code = resolve_city(name)
@@ -328,10 +373,22 @@ class TravelIntelligenceAgent:
                 und.date_phrase = v
             else:
                 und.explicit_window = tuple(v)
-        und.multi_city = und.multi_city or len(und.destinations) > 1
+        # sanity guards against model over-generation: explicit destinations
+        # make a volunteered region redundant, and one destination is not a
+        # multi-city trip — a phantom loop can make a feasible ask infeasible
+        if und.destinations:
+            und.region = None
+        und.multi_city = (und.multi_city and (len(und.destinations) > 1
+                                              or bool(und.region))) \
+            or len(und.destinations) > 1
 
         signal_values = {(s.dimension, s.value) for s in und.request_signals}
         has_dest = bool(und.destinations or und.region)
+
+        # a known destination means a trip is being planned, whatever the
+        # model thought the message alone implied — the form outranks it
+        if has_dest and und.intent == "PREFERENCE_UPDATE":
+            und.intent = "SEARCH"
 
         if not has_dest:
             if message and signal_values and und.intent != "ADVICE" \
