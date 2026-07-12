@@ -515,10 +515,10 @@ def _actual_concessions(top: Itinerary, trip: ResolvedTrip) -> list[str]:
         if gap > trip.stay_days + STAY_SLACK_AFTER:
             out.append(f"stayed {gap} days in {prev['destination_city']} to align with "
                        "available flight dates")
-    if (trip.trip_type == "multi_city" and trip.destinations
+    if (trip.trip_type in ("multi_city", "round_trip") and trip.destinations
             and top.legs[-1]["destination"] != trip.origin):
-        out.append(f"no complete loop home exists in this dataset — the itinerary ends in "
-                   f"{top.legs[-1]['destination_city']}; the final leg home must be booked "
+        out.append(f"no complete trip home exists in this dataset — the itinerary ends in "
+                   f"{top.legs[-1]['destination_city']}; the return must be booked "
                    "separately")
     return out
 
@@ -547,9 +547,10 @@ def recommend(trip: ResolvedTrip, store: FlightStore,
     orders = _destination_orders(trip, store)
     cache: dict = {}
 
-    # Pass 1: complete trips. Pass 2 (multi-city only): open-jaw — better an
-    # honest partial itinerary than an INFEASIBLE.
-    passes = [True] + ([False] if trip.trip_type == "multi_city" else [])
+    # Pass 1: complete trips. Pass 2 (round trips & multi-city): open-jaw /
+    # outbound-only — better an honest partial itinerary than an INFEASIBLE.
+    passes = [True] + ([False] if trip.trip_type in ("multi_city", "round_trip")
+                       else [])
     for include_return in passes:
         for window, window_note in _windows(trip.depart_window, now, horizon_end):
             for state, _concessions in _ladder_states():

@@ -55,6 +55,8 @@ def get_llm():
     """The configured chat model, else None (deterministic fallback).
 
     Providers, by env key: GROQ_API_KEY -> ChatGroq (llama-3.3-70b);
+    CEREBRAS_API_KEY -> ChatOpenAI against api.cerebras.ai (default
+    gpt-oss-120b — wafer-speed inference, ~1-2s turns);
     OPENROUTER_API_KEY -> ChatOpenAI against openrouter.ai (default model
     tencent/hy3:free — a reasoning model, so token budgets are generous and
     reasoning effort is pinned low). Override the model with TWIN_LLM_MODEL.
@@ -65,6 +67,18 @@ def get_llm():
             return ChatGroq(model=os.environ.get("TWIN_LLM_MODEL",
                                                  "llama-3.3-70b-versatile"),
                             temperature=0.2)
+        except ImportError:
+            return None
+    if os.environ.get("CEREBRAS_API_KEY"):
+        try:
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                model=os.environ.get("TWIN_LLM_MODEL", "gpt-oss-120b"),
+                api_key=os.environ["CEREBRAS_API_KEY"],
+                base_url="https://api.cerebras.ai/v1",
+                temperature=0.2,
+                max_tokens=6000,  # these are reasoning models too
+            )
         except ImportError:
             return None
     if os.environ.get("OPENROUTER_API_KEY"):

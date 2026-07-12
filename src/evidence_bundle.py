@@ -79,16 +79,24 @@ class EvidenceBundle:
         }
 
 
+_TYPOGRAPHY = str.maketrans({
+    "’": "'", "‘": "'", "“": '"', "”": '"',
+    " ": " ", " ": " ",            # narrow/regular no-break space
+    "‑": "-", "–": "-", "—": "-",  # hyphen/dash variants
+})
+
+
 def _norm_quote(text: str) -> str:
     """Punctuation/typography-insensitive form for quote matching."""
-    t = text.strip().lower().replace("’", "'").replace("‘", "'")
+    t = text.strip().lower().translate(_TYPOGRAPHY)
     t = re.sub(r"\s+", " ", t)
     return t.strip(" .,;:!?…\"'—-")
 
 
 def _collect(value, numbers: set, quotes: set) -> None:
     if isinstance(value, dict):
-        for v in value.values():
+        for k, v in value.items():
+            quotes.add(_norm_quote(str(k)))  # field names are ours, not fabrications
             _collect(v, numbers, quotes)
     elif isinstance(value, (list, tuple, set)):
         for v in value:
@@ -160,7 +168,9 @@ def validate_grounding(text: str, bundle: EvidenceBundle) -> list[str]:
                     and float(round(n)) not in bundle.grounding_numbers:
                 violations.append(f"number {raw} not in evidence")
     for quote in re.findall(r'[“"]([^"”]{6,})[”"]', text):
-        q = _norm_quote(quote)
-        if q and not any(q in known for known in bundle.grounding_quotes):
-            violations.append(f'quote "{quote}" not in evidence')
+        # an elided quote ("start … end") is fine iff every fragment is verbatim
+        for fragment in re.split(r"…|\.\.\.", quote):
+            q = _norm_quote(fragment)
+            if len(q) >= 6 and not any(q in known for known in bundle.grounding_quotes):
+                violations.append(f'quote "{fragment.strip()}" not in evidence')
     return violations

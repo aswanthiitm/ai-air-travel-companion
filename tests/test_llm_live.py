@@ -13,7 +13,8 @@ from src.travel_intelligence import TravelIntelligenceAgent, get_llm
 from src.twin_store import TwinStore
 
 pytestmark = pytest.mark.skipif(
-    not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("GROQ_API_KEY")),
+    not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("GROQ_API_KEY")
+         or os.environ.get("CEREBRAS_API_KEY")),
     reason="no LLM API key configured")
 
 

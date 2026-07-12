@@ -63,6 +63,7 @@ cd ui && npm install && npm run dev            # http://localhost:5173
 # Either provider works; without a key the deterministic fallback handles
 # everything (all benchmarks + tests are offline).
 export GROQ_API_KEY=...          # Groq (llama-3.3-70b-versatile), or
+export CEREBRAS_API_KEY=...      # Cerebras (gpt-oss-120b, ~2-6s turns), or
 export OPENROUTER_API_KEY=...    # OpenRouter (default: tencent/hy3:free)
 export TWIN_LLM_MODEL=...        # optional model override
 # live-mode validation: pytest tests/test_llm_live.py (skipped without a key)
