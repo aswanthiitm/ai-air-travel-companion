@@ -17,6 +17,7 @@ Two modes behind one interface:
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field, replace
 from datetime import date
 
@@ -51,6 +52,30 @@ MAX_REFINEMENTS = 1
 # Dimensions worth carrying as REQUEST signals when stated in the message.
 _REQUEST_DIMS = {"budget", "stops", "redeye", "layover_tolerance",
                  "departure_time", "occasion", "cabin_strict", "season"}
+
+# Hybrid gate: cue detectors. A cue means "the user probably expressed this,
+# so if the deterministic layer resolved nothing for it, the LLM should try."
+# The LLM is invoked ONLY when a cue is present but unresolved.
+_DATE_CUE = re.compile(
+    r"\b(week|fortnight|month|day|weekend|tomorrow|today|tonight|"
+    r"mon|tue|wed|thu|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|"
+    r"after|before|around|late|mid|early|beginning|end of|sometime|some time|"
+    r"next|this|coming|diwali|pongal|christmas|xmas|new year|holiday|"
+    r"summer|winter|spring|autumn|fall|season)\b")
+# Money cue: currency symbols, budget slang, or an amount qualifier IMMEDIATELY
+# before a number. "around"/"about" alone are date qualifiers too ("around the
+# holidays", "about three weeks"), so they only count when a digit follows.
+_MONEY_CUE = re.compile(
+    r"[$€£₹]"
+    r"|\b(?:budget|grand|lakh)\b"
+    r"|\b(?:under|below|less than|within|up to|no more than|max(?:imum)?|around|about)"
+    r"\s*\$?\s*\d"
+    r"|\d\s*k\b"
+    r"|\$?\d{3,}")
+_PEOPLE_CUE = re.compile(
+    r"\b(me and|my (?:wife|husband|partner|spouse|kids?|children|family)|family|"
+    r"adults?|children|child|kids?|infants?|passengers?|people|of us|couple|"
+    r"solo|alone|just me|two of us|group of)\b")
 
 
 def get_llm():
@@ -313,18 +338,31 @@ class TravelIntelligenceAgent:
 
     def _understand(self, message: str, slots: dict[str, Slot], profile,
                     trace: list[dict]) -> Understanding:
-        if self.llm is not None and message:
+        """Hybrid pipeline: deterministic first, LLM only to fill real gaps.
+
+        1. Fast deterministic parse (rules + normalizer harvest).
+        2. If it resolved the request confidently -> DO NOT call the LLM.
+        3. Otherwise the LLM fills ONLY the missing fields; every value it
+           returns is re-validated by the same deterministic validators.
+        """
+        und = self._understand_rules(message, slots)
+        self._deterministic_harvest(und, message, slots)
+
+        gaps = self._gaps(und, message, slots)
+        if gaps and self.llm is not None:
             try:
-                und = self._understand_llm(message, slots, profile)
-                trace.append({"step": "understand", "detail": "LLM structured output"})
-                return self._finish_understanding(und, message, slots, profile)
-            except Exception as e:  # noqa: BLE001 — LLM path must never break planning
+                self._llm_fill_gaps(und, message, slots, profile, gaps)
                 trace.append({"step": "understand",
-                              "detail": f"LLM failed ({type(e).__name__}); rule fallback"})
+                              "detail": f"deterministic + LLM gap-fill ({', '.join(gaps)})"})
+            except Exception as e:  # noqa: BLE001 — LLM must never break planning
+                trace.append({"step": "understand",
+                              "detail": f"deterministic; LLM gap-fill failed "
+                                        f"({type(e).__name__})"})
         else:
-            trace.append({"step": "understand", "detail": "rule-based (offline mode)"})
-        return self._finish_understanding(
-            self._understand_rules(message, slots), message, slots, profile)
+            detail = ("deterministic (high confidence, no LLM)" if not gaps
+                      else f"deterministic ({', '.join(gaps)} unresolved, no LLM available)")
+            trace.append({"step": "understand", "detail": detail})
+        return self._finish_understanding(und, message, slots, profile)
 
     def _understand_rules(self, message: str, slots: dict[str, Slot]) -> Understanding:
         und = Understanding(intent="SEARCH")
@@ -341,16 +379,69 @@ class TravelIntelligenceAgent:
                                 if (c := resolve_city(n))]
         return und
 
-    def _understand_llm(self, message: str, slots: dict[str, Slot],
-                        profile) -> Understanding:
-        """UNDERSTAND via structured output; VERIFY happens in _finish."""
+    def _deterministic_harvest(self, und: Understanding, message: str,
+                               slots: dict[str, Slot]) -> None:
+        """Fill dates/party/budget from free text via the deterministic
+        normalizer. Confident matches only; never overrides a form value."""
+        if not message:
+            return
+        if (und.date_phrase is None and und.explicit_window is None
+                and "dates" not in slots):
+            nd = normalize_date(message)
+            if nd.window:
+                und.explicit_window = nd.window
+            elif nd.ambiguous:
+                und.ambiguities.append({"slot": "dates", "question": nd.question})
+        if "travellers" not in slots and und.harvested_party is None:
+            und.harvested_party = normalize_party(message)
+        if "budget" not in slots and und.harvested_budget is None:
+            und.harvested_budget = normalize_budget(message)
+
+    # ------- hybrid gate: what did deterministic parsing fail to resolve? ----
+
+    def _gaps(self, und: Understanding, message: str, slots: dict[str, Slot]) -> list[str]:
+        """List the field categories a cue implies but deterministic parsing
+        left unresolved. Empty list -> the LLM is not needed."""
+        if not message:
+            return []
+        text = message.lower()
+        sig = {(s.dimension, s.value) for s in und.request_signals}
+        gaps: list[str] = []
+        if not (und.destinations or und.region or "destination" in slots):
+            gaps.append("destination")
+        has_date = bool(und.date_phrase or und.explicit_window or "dates" in slots
+                        or any(a["slot"] == "dates" for a in und.ambiguities))
+        if _DATE_CUE.search(text) and not has_date:
+            gaps.append("dates")
+        has_budget = bool(und.harvested_budget or "budget" in slots
+                          or ("budget", "minimize") in sig)
+        if _MONEY_CUE.search(text) and not has_budget:
+            gaps.append("budget")
+        has_party = bool(und.harvested_party or "travellers" in slots)
+        if _PEOPLE_CUE.search(text) and not has_party:
+            gaps.append("passengers")
+        return gaps
+
+    def _llm_fill_gaps(self, und: Understanding, message: str,
+                       slots: dict[str, Slot], profile, gaps: list[str]) -> None:
+        """Extend the EXISTING structured-output schema to cover the gap
+        fields, then validate every value through the deterministic
+        validators and fill ONLY what deterministic parsing missed. The LLM
+        never overrides a confidently-parsed value and never touches ranking,
+        the Twin, or explanations."""
         from pydantic import BaseModel, Field
 
         class UnderstandModel(BaseModel):
-            intent: str = Field(description="SEARCH, PREFERENCE_UPDATE, or ADVICE")
+            intent: str = Field("SEARCH", description="SEARCH, PREFERENCE_UPDATE, or ADVICE")
             destination_names: list[str] = Field(default_factory=list)
             region: str | None = None
+            dates: str | None = Field(None, description="ISO date/range or a short "
+                                      "phrase like 'mid August'; null if unstated")
+            budget: str | None = Field(None, description="numeric cap only, e.g. '2000'")
+            passengers: int | None = Field(None, description="total travellers, 1-9")
+            max_stops: int | None = Field(None, description="0, 1, or 2; null if unstated")
             purpose: str | None = Field(None, description="business|leisure|mixed")
+            flexible_dates: bool = False
             wants_comfort: bool = False
             wants_cheapest: bool = False
             avoid_redeye: bool = False
@@ -360,32 +451,85 @@ class TravelIntelligenceAgent:
 
         known = {k: str(s.value) for k, s in slots.items()}
         prompt = (
-            "You are the Travel Intelligence Agent. The following form fields are "
-            f"VALIDATED FACTS — do not re-extract or second-guess them: {known}. "
-            f"The traveler's profile: {profile.trip_purpose} traveler from "
-            f"{profile.home_city}. Analyze ONLY the free-text message for intent "
-            "and anything the form doesn't cover. If a destination is already "
-            "known (form or message), intent is SEARCH.\n\nMessage: " + message)
+            "You are the input-understanding layer of a flight planner. Convert "
+            "the traveler's message into structured fields ONLY. Do not rank, "
+            "recommend, or explain. These form fields are already VALIDATED — do "
+            f"not restate or second-guess them: {known}. Unresolved gaps to try: "
+            f"{gaps}. If a value is not clearly stated, return null (never guess). "
+            "Normalize numbers: 'two grand'->2000, '60k'->60000. Message:\n" + message)
         out = _json_invoke(self.llm, prompt, UnderstandModel)
 
-        und = self._understand_rules(message, slots)  # deterministic floor
+        from .airports import REGION_ALIASES, resolve_city
+
+        # --- non-gap fields (shape/intent/purpose): merge, never override ----
         und.intent = out.intent if out.intent in ("SEARCH", "PREFERENCE_UPDATE",
-                                                  "ADVICE") else "SEARCH"
-        # vocabulary guard: models say things like "honeymoon" here
-        und.purpose = out.purpose if out.purpose in ("business", "leisure",
-                                                     "mixed") else None
+                                                  "ADVICE") else und.intent
+        if out.purpose in ("business", "leisure", "mixed") and not und.purpose:
+            und.purpose = out.purpose
         und.round_trip = und.round_trip or bool(out.round_trip)
         und.multi_city = und.multi_city or bool(out.multi_city)
         und.advise_only = und.advise_only or bool(out.advise_only)
-        from .airports import resolve_city
-        for name in out.destination_names:      # VERIFY: gazetteer or it didn't happen
-            code = resolve_city(name)
-            if code and code not in und.destinations:
-                und.destinations.append(code)
-        if out.region and not und.region:
-            from .airports import REGION_ALIASES
-            und.region = REGION_ALIASES.get(out.region.lower())
-        return und
+
+        # Once the LLM is invoked for any gap, let it fill ANY field the
+        # deterministic layer still missed (each re-validated below). It never
+        # overrides a value deterministic parsing already resolved.
+
+        # --- destination: gazetteer VERIFY ----------------------------------
+        if not (und.destinations or und.region):
+            for name in out.destination_names:
+                code = resolve_city(name)
+                if code and code not in und.destinations:
+                    und.destinations.append(code)
+            if out.region and not und.region:
+                und.region = REGION_ALIASES.get(out.region.lower())
+
+        # --- dates: validate via the existing date validator ----------------
+        if out.dates and not (und.date_phrase or und.explicit_window):
+            win, phrase, _err = parse_dates_field(out.dates)
+            if win:
+                und.explicit_window = win
+            elif phrase:
+                und.date_phrase = phrase
+
+        # --- budget: validate via normalize_budget + range ------------------
+        if out.budget and und.harvested_budget is None:
+            b = normalize_budget(str(out.budget))
+            if b is None:
+                try:
+                    v = float(str(out.budget).replace(",", "").replace("$", ""))
+                    b = v if 20 <= v <= 50000 else None
+                except (TypeError, ValueError):
+                    b = None
+            und.harvested_budget = b
+
+        # --- passengers: validate range -------------------------------------
+        if out.passengers and und.harvested_party is None:
+            if 1 <= int(out.passengers) <= 9:
+                und.harvested_party = int(out.passengers)
+
+        # --- discrete preference hints -> REQUEST signals (validated) -------
+        # These reuse the SAME downstream machinery as deterministic signals;
+        # previously the model returned wants_* booleans that were discarded.
+        sig = {(s.dimension, s.value) for s in und.request_signals}
+
+        def add_signal(dim, val, evidence):
+            if (dim, val) not in sig:
+                und.request_signals.append(
+                    PreferenceSignal(dim, val, Source.REQUEST, evidence, 0.85))
+                sig.add((dim, val))
+
+        if out.max_stops is not None and out.max_stops in (0, 1, 2):
+            if not any(d == "stops" for d, _ in sig):
+                add_signal("stops", "avoid" if out.max_stops == 0 else "limit_1",
+                           f"max_stops={out.max_stops} (interpreted)")
+        if out.avoid_redeye:
+            add_signal("redeye", "avoid", "avoid overnight flights (interpreted)")
+        if out.wants_cheapest:
+            add_signal("budget", "minimize", "wants the cheapest option (interpreted)")
+        if out.wants_comfort:
+            add_signal("budget", "unconstrained", "comfort over cost (interpreted)")
+        if out.flexible_dates:
+            add_signal("dates", "flexible", "flexible on dates (interpreted)")
 
     def _finish_understanding(self, und: Understanding, message: str,
                               slots: dict[str, Slot], profile) -> Understanding:
@@ -413,23 +557,6 @@ class TravelIntelligenceAgent:
         und.multi_city = (und.multi_city and (len(und.destinations) > 1
                                               or bool(und.region))) \
             or len(und.destinations) > 1
-
-        # ---- Input Normalizer: harvest structured values from free text ----
-        # Only fills what neither the form nor the existing parser provided;
-        # never overrides a form slot or an already-detected date. Confident
-        # matches only — unresolved stays null (never invented).
-        if message:
-            if (und.date_phrase is None and und.explicit_window is None
-                    and "dates" not in slots):
-                nd = normalize_date(message)
-                if nd.window:
-                    und.explicit_window = nd.window
-                elif nd.ambiguous:
-                    und.ambiguities.append({"slot": "dates", "question": nd.question})
-            if "travellers" not in slots and und.harvested_party is None:
-                und.harvested_party = normalize_party(message)
-            if "budget" not in slots and und.harvested_budget is None:
-                und.harvested_budget = normalize_budget(message)
 
         signal_values = {(s.dimension, s.value) for s in und.request_signals}
         has_dest = bool(und.destinations or und.region)

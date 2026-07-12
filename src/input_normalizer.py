@@ -200,11 +200,27 @@ _BUDGET_CAP = re.compile(
     r"(?:under|below|less than|within|max(?:imum)?|budget of|up to|no more than|"
     r"around|about|approx(?:imately)?|roughly|~)\s*\$?\s*(\d[\d,]*)")
 _BUDGET_BARE = re.compile(r"\$\s*(\d[\d,]*)|\b(\d[\d,]{2,})\s*(?:dollars|usd|budget)\b")
+# Shorthand multipliers: '50k' -> 50000, '3 grand' -> 3000, '2 lakh' -> 200000.
+# Amounts are treated as the dataset's currency (USD); no FX conversion.
+_MULTIPLIERS = {"k": 1_000, "grand": 1_000, "lakh": 100_000, "lakhs": 100_000}
+_BUDGET_MULT = re.compile(
+    r"(\d[\d,.]*|" + "|".join(_WORD_NUM) + r")\s*(k|grand|lakhs?)\b")
 
 
 def normalize_budget(text: str, require_keyword: bool = False) -> float | None:
-    """'under $500' / 'around 1000' / '$1200' -> 500.0 / 1000.0 / 1200.0."""
+    """'under $500' / 'around 1000' / '$1200' / '50k' / '3 grand' -> a number."""
     t = text.lower()
+    mult = _BUDGET_MULT.search(t)
+    if mult:
+        num = _WORD_NUM.get(mult.group(1))
+        if num is None:
+            try:
+                num = float(mult.group(1).replace(",", ""))
+            except ValueError:
+                num = None
+        if num is not None:
+            value = num * _MULTIPLIERS[mult.group(2)]
+            return value if 20 <= value <= 5_000_000 else None
     m = _BUDGET_CAP.search(t)
     if not m and not require_keyword:
         m = _BUDGET_BARE.search(t)
@@ -240,9 +256,9 @@ def normalize_party(text: str) -> int | None:
                  r"two of us|a couple|as a couple)\b", t):
         return 2
 
-    fam = re.search(r"\bfamily of (\d+|" + "|".join(_WORD_NUM) + r")\b", t)
-    if fam:
-        n = _to_int(fam.group(1))
+    grp = re.search(r"\b(?:family|party|group) of (\d+|" + "|".join(_WORD_NUM) + r")\b", t)
+    if grp:
+        n = _to_int(grp.group(1))
         if n and 1 <= n <= 9:
             return n
 
