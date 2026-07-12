@@ -7,6 +7,10 @@ fastapi>=0.115
 uvicorn[standard]>=0.32
 httpx>=0.27
 
-# Reasoning layer (optional: agent mode needs GROQ_API_KEY; offline fallback otherwise)
+# Reasoning layer (optional: agent mode needs an LLM API key; deterministic
+# fallback otherwise). langchain-groq powers GROQ_API_KEY; langchain-openai
+# powers CEREBRAS_API_KEY and OPENROUTER_API_KEY (both use the OpenAI-
+# compatible chat completions API via a custom base_url).
 langchain-core>=1.0
 langchain-groq>=1.0
+langchain-openai>=1.0

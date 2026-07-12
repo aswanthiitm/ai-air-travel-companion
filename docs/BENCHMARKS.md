@@ -6,7 +6,7 @@ Assumptions). Regenerate with `python -m src.evaluation --report`.
 
 ---
 
-## B01 — U01 (0.33s)
+## B01 — U01 (0.34s)
 
 > I need to get from home to Tokyo next month, what do you suggest?
 
@@ -58,7 +58,7 @@ Search funnel: 50,000 → 57 → 36 → 36 → 5 → 5 → 3 → 3 → 3 → 3
 
 ---
 
-## B02 — U02 (4.98s)
+## B02 — U02 (6.08s)
 
 > Find me the best way to do a London + Paris + Rome trip in one journey.
 
@@ -113,7 +113,7 @@ Search funnel: 50,000 → 58 → 36 → 36 → 36 → 36 → 36 → 36 → 36 �
 
 ---
 
-## B03 — U03 (0.06s)
+## B03 — U03 (0.1s)
 
 > Cheapest option to Bali, I'm flexible on dates over the summer.
 
@@ -163,7 +163,7 @@ Search funnel: 50,000 → 39 → 6 → 5 → 5 → 5 → 2 → 2 → 2 → 2
 
 ---
 
-## B04 — U04 (0.27s)
+## B04 — U04 (0.44s)
 
 > Book me something to New York for a Tuesday meeting, back Thursday.
 
@@ -212,7 +212,7 @@ Search funnel: 50,000 → 46 → 22 → 22 → 22 → 22 → 22 → 22 → 22 �
 
 ---
 
-## B05 — U05 (0.06s)
+## B05 — U05 (0.09s)
 
 > I want to visit Sydney around the holidays — what should I expect?
 
@@ -263,7 +263,7 @@ Search funnel: 50,000 → 9 → 3 → 3 → 1 → 1 → 1 → 1 → 1 → 1
 
 ---
 
-## B06 — U06 (3.22s)
+## B06 — U06 (4.73s)
 
 > Plan a multi-city Asia trip, I have about three weeks of flexibility.
 

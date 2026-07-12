@@ -5,7 +5,8 @@
 > on their behalf — and shows its work.
 
 Built for the **Expedia Group Innovation Hackathon** (Problem Statement 1:
-AI Air Travel Companion).
+AI Air Travel Companion). See [docs/SOLUTION_SUMMARY.md](docs/SOLUTION_SUMMARY.md)
+for the submission-facing problem/solution/impact summary.
 
 ## The idea
 
@@ -79,11 +80,15 @@ python3 -m uvicorn src.api:app --port 8010     # backend API
 cd ui && npm install && npm run dev            # frontend on :5173 (proxies /api)
 ```
 
-Pick a traveler, ask in plain language (or click a benchmark chip), and watch
-the three panels: **The Twin** (evidence-backed profile with steerable
-decision weights), **The Reasoning** (request resolution, the search funnel,
-honest concessions), **The Verdict** (top pick + named alternatives with
-Worth-It math, scarcity and holiday badges).
+Pick a traveler, fill in as much or as little of the form as you like, and
+add a free-text note (or click a benchmark chip). The app opens in
+**Traveler View**: what the system understood, a plain-language
+recommendation with named alternatives (Worth-It math, scarcity and holiday
+badges), a route map, and a readable Traveler Twin summary. Toggle to
+**Judge / Developer View** to see the same result through the engine's eyes —
+the pipeline strip, the Traveler DNA dial with steerable decision weights,
+the agent's reasoning trace, and the honest concession log. Reject a
+recommendation with a reason and watch the Twin panel update live.
 
 ## Assumptions
 
@@ -123,6 +128,8 @@ Documented as they are made (hackathon FAQ #6):
 | 7a | Living Twin store (event-sourced learning, confidence math, profile merge) | ✅ done |
 | 7b | Travel Intelligence Agent + Evidence Bundle + AI Companion + /api/plan | ✅ done |
 | 7c | Single planning surface UI + live feedback loop | ✅ done |
+| 7d | Natural-language input understanding: deterministic normalizer + hybrid LLM gap-fill (LLM only for genuine ambiguity, always validated) | ✅ done |
+| 7e | Traveler View / Judge-Developer View UI split; plain-language "why this pick" and "good to know" for travelers, full technical detail preserved for judges | ✅ done |
 
 ## Limitations & future work
 
