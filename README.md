@@ -54,6 +54,14 @@ pip install -r requirements.txt
 pytest                              # dataset invariants + module contracts
 python -m src.evaluation            # run all 6 benchmark prompts end-to-end
 python -m src.evaluation --report   # + regenerate docs/BENCHMARKS.md
+
+# the app (API + flight-deck UI)
+python3 -m uvicorn src.api:app --port 8010
+cd ui && npm install && npm run dev            # http://localhost:5173
+
+# optional agent mode: LLM understanding + composed replies (Groq free tier)
+export GROQ_API_KEY=...                        # without it, the deterministic
+                                               # fallback handles everything
 ```
 
 Requires Python 3.10+. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the
@@ -107,6 +115,9 @@ Documented as they are made (hackathon FAQ #6):
 | 5 | Explanation engine + benchmark runner | ✅ done |
 | 6a | FastAPI layer + React flight-deck with working data flow | ✅ done |
 | 6b | Visual polish (Traveler DNA dial, route map, funnel animation, boarding passes) | ✅ done |
+| 7a | Living Twin store (event-sourced learning, confidence math, profile merge) | ✅ done |
+| 7b | Travel Intelligence Agent + Evidence Bundle + AI Companion + /api/plan | ✅ done |
+| 7c | Single planning surface UI + live feedback loop | ✅ done |
 
 ## Limitations & future work
 

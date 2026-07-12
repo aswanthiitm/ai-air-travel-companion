@@ -6,13 +6,51 @@ export default function ReasoningPanel({ result, loading, error, airports }) {
   if (loading) return <div className="panel"><h2>The Reasoning</h2><p className="status">Negotiating with 50,000 flights…</p></div>;
   if (!result) return <div className="panel"><h2>The Reasoning</h2><p className="status">Ask something to watch the search unfold</p></div>;
 
-  const { recommendation: rec, trip } = result;
+  const { recommendation: rec, trip, reasoning } = result;
   const max = rec.funnel.length ? rec.funnel[0].count : 1;
   const runKey = rec.top ? rec.top.flight_ids.join("-") : "none";
 
   return (
     <div className="panel">
       <h2>The Reasoning</h2>
+
+      {reasoning && (
+        <>
+          <h3>What the agent decided</h3>
+          <ul className="note-list">
+            <li>intent {reasoning.intent}{reasoning.purpose ? ` · ${reasoning.purpose}` : ""} ·
+              strategy <b>{reasoning.strategy.replace(/_/g, " ").toLowerCase()}</b>
+              {reasoning.strategy_rationale ? ` — ${reasoning.strategy_rationale}` : ""}</li>
+            {reasoning.planning_context.map((c, i) => <li key={`pc${i}`}>{c}</li>)}
+          </ul>
+          {reasoning.contradictions.length > 0 && (
+            <div className="chip-list" style={{ marginTop: 6 }}>
+              {reasoning.contradictions.map((c, i) => (
+                <div className="evidence-chip conflict" key={i}>
+                  <b>Tension noticed:</b> the request says “{c.request_says}” but the
+                  Twin says {c.twin_says} — {c.resolution}
+                </div>
+              ))}
+            </div>
+          )}
+          {reasoning.refinements.length > 0 && (
+            <ul className="note-list concession-list" style={{ marginTop: 6 }}>
+              {reasoning.refinements.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+          )}
+        </>
+      )}
+
+      {result.trace?.length > 0 && (
+        <>
+          <h3>Agent trace</h3>
+          <div className="trace-row">
+            {result.trace.map((t, i) => (
+              <span className="trace-chip" key={i} title={t.detail}>{t.step}</span>
+            ))}
+          </div>
+        </>
+      )}
 
       {rec.top && <RouteMap legs={rec.top.legs} airports={airports} />}
 

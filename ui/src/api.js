@@ -9,6 +9,19 @@ async function request(path, options) {
 
 export const getUsers = () => request("/api/users");
 export const getAirports = () => request("/api/airports");
+export const getTwin = (userId) => request(`/api/twin/${userId}`);
+export const postPlan = (body) =>
+  request("/api/plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+export const postFeedback = (body) =>
+  request("/api/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 export const getProfile = (userId) => request(`/api/profile/${userId}`);
 export const getBenchmarks = () => request("/api/benchmarks");
 export const postRecommend = (body) =>

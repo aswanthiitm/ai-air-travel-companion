@@ -212,7 +212,7 @@ class TravelIntelligenceAgent:
             strategy_rationale=und.strategy_rationale,
             flexibility_days=trip.profile.flexibility.date_flexibility_days,
             contradictions=und.contradictions,
-            planning_context=self._planning_context(profile, und, slots),
+            planning_context=self._planning_context(trip.profile, und, slots),
             refinements=refinements)
 
         bundle = build_bundle(trip, rec, expl, reasoning, slots, message,

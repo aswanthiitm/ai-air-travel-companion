@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 function fmtMin(m) {
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}m`;
@@ -20,7 +20,47 @@ function Legs({ legs }) {
   );
 }
 
-function BoardingPass({ itinerary, label, headline, deltaPrice, deltaMinutes, worthIt, isTop, index }) {
+function itinerarySummary(itinerary) {
+  return {
+    max_stops: itinerary.max_stops,
+    is_redeye: itinerary.legs.some((l) => l.is_redeye),
+    airlines: [...new Set(itinerary.legs.map((l) => l.airline_code))],
+    cabins: [...new Set(itinerary.legs.map((l) => l.cabin_class))],
+    total_price: itinerary.total_price,
+  };
+}
+
+function FeedbackBar({ itinerary, onFeedback }) {
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [done, setDone] = useState(null);
+  if (done) return <div className="feedback-bar done">✓ {done} — the Twin took note</div>;
+  if (rejecting) {
+    return (
+      <div className="feedback-bar">
+        <input type="text" placeholder="Why not? (optional — the Twin learns from this)"
+               value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
+        <button onClick={() => {
+          onFeedback("recommendation_rejected",
+                     { itinerary: itinerarySummary(itinerary), reason: reason || undefined });
+          setDone("rejected");
+        }}>Send</button>
+        <button className="ghost" onClick={() => setRejecting(false)}>Cancel</button>
+      </div>
+    );
+  }
+  return (
+    <div className="feedback-bar">
+      <button onClick={() => {
+        onFeedback("recommendation_accepted", { itinerary: itinerarySummary(itinerary) });
+        setDone("accepted");
+      }}>Take this one</button>
+      <button className="ghost" onClick={() => setRejecting(true)}>Not for me</button>
+    </div>
+  );
+}
+
+function BoardingPass({ itinerary, label, headline, deltaPrice, deltaMinutes, worthIt, isTop, index, onFeedback }) {
   const scarce = itinerary.scarce;
   const holiday = itinerary.annotations.some((a) => a.is_holiday_season);
   const stops = [itinerary.legs[0].origin, ...itinerary.legs.map((l) => l.destination)];
@@ -74,11 +114,12 @@ function BoardingPass({ itinerary, label, headline, deltaPrice, deltaMinutes, wo
           </b>
         </div>
       )}
+      {isTop && onFeedback && <FeedbackBar itinerary={itinerary} onFeedback={onFeedback} />}
     </article>
   );
 }
 
-export default function VerdictPanel({ result }) {
+export default function VerdictPanel({ result, onFeedback }) {
   if (!result) return <div className="panel"><h2>The Verdict</h2><p className="status">No recommendation yet</p></div>;
   const { recommendation: rec, explanation: expl } = result;
   if (!rec.feasible) {
@@ -92,7 +133,8 @@ export default function VerdictPanel({ result }) {
   return (
     <div className="panel">
       <h2>The Verdict</h2>
-      <BoardingPass itinerary={rec.top} headline={expl.headline} isTop index={0} />
+      <BoardingPass itinerary={rec.top} headline={expl.headline} isTop index={0}
+                    onFeedback={onFeedback} />
 
       {rec.alternatives.map((alt, i) => (
         <BoardingPass
