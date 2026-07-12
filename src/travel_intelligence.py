@@ -25,6 +25,8 @@ from .companion import compose
 from .evidence_bundle import AgentReasoning, EvidenceBundle, build_bundle
 from .explanation_engine import Explanation, explain
 from .inference_engine import ResolvedTrip, resolve
+from .input_normalizer import (normalize_budget, normalize_date, normalize_party,
+                               normalize_tone)
 from .planner_validators import Slot, validate_fields
 from .preference_extractor import PreferenceSignal, Source, extract_history
 from .preprocessing import FlightStore
@@ -135,6 +137,8 @@ class Understanding:
     request_signals: list[PreferenceSignal] = field(default_factory=list)
     contradictions: list[dict] = field(default_factory=list)
     ambiguities: list[dict] = field(default_factory=list)   # {slot, question}
+    harvested_budget: float | None = None   # NL budget found in the message
+    harvested_party: int | None = None       # NL passenger count in the message
 
 
 @dataclass
@@ -188,6 +192,20 @@ class TravelIntelligenceAgent:
                                 f"{self.twin.event_count(user_id)} live events"})
 
         und = self._understand(message, slots, profile, trace)
+
+        # Fold message-harvested counts/budget into slots so they flow through
+        # the identical downstream logic (required_seats, strategy) as the
+        # form fields — never overriding a value the form already set.
+        if "travellers" not in slots and und.harvested_party:
+            slots["travellers"] = Slot(und.harvested_party, "text", 0.9,
+                                       f"message: party of {und.harvested_party}")
+            trace.append({"step": "normalize_input",
+                          "detail": f"party of {und.harvested_party} from message"})
+        if "budget" not in slots and und.harvested_budget:
+            slots["budget"] = Slot(und.harvested_budget, "text", 0.9,
+                                   f"message: budget ${und.harvested_budget:.0f}")
+            trace.append({"step": "normalize_input",
+                          "detail": f"budget ${und.harvested_budget:.0f} from message"})
 
         if und.intent == "PREFERENCE_UPDATE":
             changes = self.twin.record(user_id, "preference_stated",
@@ -396,6 +414,23 @@ class TravelIntelligenceAgent:
                                               or bool(und.region))) \
             or len(und.destinations) > 1
 
+        # ---- Input Normalizer: harvest structured values from free text ----
+        # Only fills what neither the form nor the existing parser provided;
+        # never overrides a form slot or an already-detected date. Confident
+        # matches only — unresolved stays null (never invented).
+        if message:
+            if (und.date_phrase is None and und.explicit_window is None
+                    and "dates" not in slots):
+                nd = normalize_date(message)
+                if nd.window:
+                    und.explicit_window = nd.window
+                elif nd.ambiguous:
+                    und.ambiguities.append({"slot": "dates", "question": nd.question})
+            if "travellers" not in slots and und.harvested_party is None:
+                und.harvested_party = normalize_party(message)
+            if "budget" not in slots and und.harvested_budget is None:
+                und.harvested_budget = normalize_budget(message)
+
         signal_values = {(s.dimension, s.value) for s in und.request_signals}
         has_dest = bool(und.destinations or und.region)
 
@@ -417,10 +452,15 @@ class TravelIntelligenceAgent:
         if und.advise_only:
             und.intent = "ADVICE"
 
-        # strategy: the agent's judgment, as a label
+        # strategy: the agent's judgment, as a label. A conversational tone
+        # hint ("fastest", "cheap", "comfortable") folds into the existing
+        # detectors; only "fastest" adds behavior the system lacked.
+        tone = normalize_tone(message) if message else None
         occasion = ("occasion", "special") in signal_values
-        comfort_asked = occasion or ("budget", "unconstrained") in signal_values
-        cheap_asked = ("budget", "minimize") in signal_values or "budget" in slots
+        comfort_asked = (occasion or ("budget", "unconstrained") in signal_values
+                         or tone == "comfort")
+        cheap_asked = (("budget", "minimize") in signal_values or "budget" in slots
+                       or und.harvested_budget is not None or tone == "cheapest")
         if und.advise_only:
             und.strategy, und.strategy_rationale = "ADVISE_ONLY", "expectation-setting ask"
         elif und.multi_city or und.region:
@@ -431,6 +471,8 @@ class TravelIntelligenceAgent:
                                       "price" if occasion else "comfort explicitly requested")
         elif cheap_asked:
             und.strategy, und.strategy_rationale = "CHEAPEST_FIRST", "price explicitly leads"
+        elif tone == "fastest":
+            und.strategy, und.strategy_rationale = "SCHEDULE_FIRST", "fastest/quickest requested"
         elif (und.purpose or profile.trip_purpose) == "business":
             und.strategy, und.strategy_rationale = "SCHEDULE_FIRST", "business trip: schedule fit leads"
         else:

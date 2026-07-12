@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from .airports import resolve_city
+from .input_normalizer import normalize_budget, normalize_date, normalize_party
 from .recommendation_engine import CABIN_ORDER
 from .request_parser import DatePhrase, _find_date_phrase
 
@@ -62,6 +63,12 @@ def parse_dates_field(text: str) -> tuple[tuple[date, date] | None, DatePhrase |
     phrase = _find_date_phrase(text.lower())
     if phrase:
         return None, phrase, None
+    # conversational dates ("mid August", "first week of July", "around
+    # Christmas") -> a concrete window; anything not confidently understood
+    # falls through to the existing error (never invented).
+    normalized = normalize_date(text)
+    if normalized.window:
+        return normalized.window, None, None
     return None, None, f"could not understand dates {text!r}"
 
 
@@ -92,15 +99,23 @@ def validate_fields(fields: dict | None) -> tuple[dict[str, Slot], list[str]]:
         else:
             slots["dates"] = _form_slot(window or phrase, "dates")
 
-    if fields.get("travellers") not in (None, ""):
-        try:
-            n = int(fields["travellers"])
-            if 1 <= n <= 9:
-                slots["travellers"] = _form_slot(n, "travellers")
-            else:
-                errors.append("travellers must be between 1 and 9 (GDS seat cap)")
-        except (TypeError, ValueError):
-            errors.append(f"travellers must be a number, got {fields['travellers']!r}")
+    raw_pax = fields.get("travellers")
+    if raw_pax not in (None, ""):
+        # conversational counts ("family of four", "just me") -> integer;
+        # plain numbers keep the exact existing validation (incl. range error).
+        nlp = normalize_party(raw_pax) if (isinstance(raw_pax, str)
+              and not raw_pax.strip().lstrip("-").isdigit()) else None
+        if nlp is not None:
+            slots["travellers"] = _form_slot(nlp, "travellers")
+        else:
+            try:
+                n = int(raw_pax)
+                if 1 <= n <= 9:
+                    slots["travellers"] = _form_slot(n, "travellers")
+                else:
+                    errors.append("travellers must be between 1 and 9 (GDS seat cap)")
+            except (TypeError, ValueError):
+                errors.append(f"travellers must be a number, got {raw_pax!r}")
 
     raw_cabin = (fields.get("cabin") or "").strip().lower()
     if raw_cabin:
@@ -111,14 +126,28 @@ def validate_fields(fields: dict | None) -> tuple[dict[str, Slot], list[str]]:
             errors.append(f"unknown cabin {fields['cabin']!r} "
                           f"(one of: {', '.join(CABIN_ORDER)})")
 
-    if fields.get("budget") not in (None, ""):
-        try:
-            b = float(fields["budget"])
-            if b > 0:
-                slots["budget"] = _form_slot(round(b, 2), "budget")
-            else:
-                errors.append("budget must be positive")
-        except (TypeError, ValueError):
-            errors.append(f"budget must be a number, got {fields['budget']!r}")
+    raw_budget = fields.get("budget")
+    if raw_budget not in (None, ""):
+        def _plain_number(v) -> bool:
+            try:
+                float(v)
+                return True
+            except (TypeError, ValueError):
+                return False
+        # conversational budgets ("under $500", "around 1000") -> number;
+        # plain numbers keep the exact existing validation (incl. positivity).
+        nlp = normalize_budget(raw_budget) if (isinstance(raw_budget, str)
+              and not _plain_number(raw_budget)) else None
+        if nlp is not None:
+            slots["budget"] = _form_slot(round(nlp, 2), "budget")
+        else:
+            try:
+                b = float(raw_budget)
+                if b > 0:
+                    slots["budget"] = _form_slot(round(b, 2), "budget")
+                else:
+                    errors.append("budget must be positive")
+            except (TypeError, ValueError):
+                errors.append(f"budget must be a number, got {raw_budget!r}")
 
     return slots, errors
