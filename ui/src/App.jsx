@@ -121,7 +121,7 @@ export default function App() {
     <>
       <header className="masthead">
         <h1>Traveler Twin</h1>
-        <span className="tagline">AI reasons. Python computes. The Twin remembers.</span>
+        <span className="tagline">Intelligent Travel, Tailored to Every Traveler</span>
         {result && <span className="tagline">simulated today: {result.simulated_now}</span>}
         <div className="view-toggle" role="tablist" aria-label="View mode">
           <button className={view === "user" ? "on" : ""} onClick={() => setView("user")}>

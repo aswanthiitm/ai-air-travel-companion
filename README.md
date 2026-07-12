@@ -1,6 +1,6 @@
 # Traveler Twin — AI Air Travel Companion
 
-> **Google Flights knows flights. Expedia knows travelers.**
+> **Intelligent Travel, Tailored to Every Traveler**
 > A glass-box digital twin of each traveler that negotiates flight trade-offs
 > on their behalf — and shows its work.
 
