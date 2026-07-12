@@ -301,6 +301,72 @@ body {
 }
 .feedback-bar.done { color: var(--good); font-size: 12px; font-weight: 600; }
 
+/* ---- User / Judge view toggle --------------------------------------------- */
+.view-toggle { margin-left: auto; display: flex; gap: 0; border: 1px solid var(--ink);
+  border-radius: 999px; overflow: hidden; }
+.view-toggle button {
+  font: inherit; font-size: 12px; font-weight: 700; padding: 6px 14px; border: none;
+  background: transparent; color: var(--ink-soft); cursor: pointer;
+}
+.view-toggle button.on { background: var(--ink); color: var(--paper); }
+
+.stage-status { padding: 60px 28px; text-align: center; font-family: var(--serif);
+  font-style: italic; font-size: 16px; color: var(--ink-soft); }
+.stage-status.error { color: #8a3218; font-style: normal; }
+
+/* ---- User story view ------------------------------------------------------- */
+.story { max-width: 780px; margin: 0 auto; padding: 22px 24px 60px;
+  display: flex; flex-direction: column; gap: 22px; }
+.eyebrow { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+
+.journey-summary { border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 14px; }
+.summary-cell label { display: block; font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.summary-cell output { font-family: var(--serif); font-size: 17px; color: var(--navy);
+  text-transform: capitalize; }
+
+.companion-note { background: var(--accent-soft); border-radius: 12px; padding: 16px 20px; }
+.companion-note p { font-family: var(--serif); font-size: 16px; line-height: 1.55; }
+
+.verdict-embedded { display: block; }
+.verdict-embedded h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--ink-soft); margin: 16px 0 6px; }
+.verdict-embedded .pass { max-width: none; }
+
+.story-map .route-map { margin: 0; }
+
+.twin-summary { border-top: 1px solid var(--line); padding-top: 18px; }
+.twin-sub { font-family: var(--serif); font-style: italic; color: var(--ink-soft);
+  margin-bottom: 12px; }
+.meters { display: flex; flex-direction: column; gap: 7px; max-width: 420px; }
+.meter-row { display: flex; align-items: center; gap: 10px; }
+.meter-row label { width: 110px; font-size: 12px; color: var(--ink-soft); }
+.meter { flex: 1; height: 8px; background: var(--accent-soft); border-radius: 4px;
+  overflow: hidden; }
+.meter > div { height: 100%; background: var(--navy); }
+.twin-learned { margin-top: 12px; }
+.twin-learned label { display: block; font-family: var(--mono); font-size: 9px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 5px; }
+.learned-chip { display: inline-block; font-size: 11px; padding: 3px 9px; margin: 0 5px 5px 0;
+  border-radius: 999px; background: var(--navy-soft); color: var(--navy); }
+
+/* ---- Judge / developer view ------------------------------------------------ */
+.judge { padding-top: 6px; }
+.pipeline-strip { display: flex; align-items: stretch; gap: 4px; flex-wrap: wrap;
+  padding: 14px 28px; border-bottom: 1px solid var(--line); background: var(--paper-raised); }
+.pl-step { flex: 1; min-width: 150px; background: #fff; border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 11px; }
+.pl-check { display: inline-flex; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--good); color: #fff; font-size: 10px; align-items: center;
+  justify-content: center; margin-bottom: 4px; }
+.pl-title { font-weight: 700; font-size: 12px; }
+.pl-tag { font-family: var(--mono); font-size: 10px; color: var(--accent); }
+.pl-sub { font-size: 10px; color: var(--ink-soft); }
+.pl-arrow { align-self: center; color: var(--ink-soft); font-size: 14px; }
+
 /* ---- Quality floor --------------------------------------------------------- */
 button:focus-visible, select:focus-visible, input:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;

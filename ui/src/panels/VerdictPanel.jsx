@@ -119,23 +119,27 @@ function BoardingPass({ itinerary, label, headline, deltaPrice, deltaMinutes, wo
   );
 }
 
-export default function VerdictPanel({ result, onFeedback }) {
+export default function VerdictPanel({ result, onFeedback, embedded }) {
   if (!result) return <div className="panel"><h2>The Verdict</h2><p className="status">No recommendation yet</p></div>;
   const { recommendation: rec, explanation: expl } = result;
   if (!rec.feasible) {
     return (
-      <div className="panel">
-        <h2>The Verdict</h2>
+      <div className={embedded ? "verdict-embedded" : "panel"}>
+        {!embedded && <h2>The Verdict</h2>}
         <p className="status">{expl.headline}</p>
       </div>
     );
   }
+  const Wrap = embedded ? "section" : "div";
   return (
-    <div className="panel">
-      <h2>The Verdict</h2>
+    <Wrap className={embedded ? "verdict-embedded" : "panel"}>
+      {!embedded && <h2>The Verdict</h2>}
+      {embedded && <h3 className="eyebrow">Recommended for you</h3>}
       <BoardingPass itinerary={rec.top} headline={expl.headline} isTop index={0}
                     onFeedback={onFeedback} />
 
+      {rec.alternatives.length > 0 && embedded && (
+        <h3 className="eyebrow" style={{ marginTop: 18 }}>You may also consider</h3>)}
       {rec.alternatives.map((alt, i) => (
         <BoardingPass
           key={alt.label}
@@ -170,6 +174,6 @@ export default function VerdictPanel({ result, onFeedback }) {
           </ul>
         </>
       )}
-    </div>
+    </Wrap>
   );
 }

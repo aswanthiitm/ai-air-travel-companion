@@ -4,6 +4,10 @@ import { getAirports, getBenchmarks, getProfile, getTwin, getUsers,
 import TwinPanel from "./panels/TwinPanel.jsx";
 import ReasoningPanel from "./panels/ReasoningPanel.jsx";
 import VerdictPanel from "./panels/VerdictPanel.jsx";
+import JourneySummary from "./panels/JourneySummary.jsx";
+import PipelineStrip from "./panels/PipelineStrip.jsx";
+import TwinSummary from "./panels/TwinSummary.jsx";
+import RouteMap from "./panels/RouteMap.jsx";
 
 const EMPTY_FIELDS = { origin: "", destination: "", dates: "", travellers: "", cabin: "", budget: "" };
 
@@ -23,6 +27,7 @@ export default function App() {
   const [toast, setToast] = useState(null);          // twin_updates flash
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [view, setView] = useState("user");          // user | judge
 
   useEffect(() => {
     getUsers().then(setUsers).catch((e) => setError(e.message));
@@ -118,6 +123,14 @@ export default function App() {
         <h1>Traveler Twin</h1>
         <span className="tagline">AI reasons. Python computes. The Twin remembers.</span>
         {result && <span className="tagline">simulated today: {result.simulated_now}</span>}
+        <div className="view-toggle" role="tablist" aria-label="View mode">
+          <button className={view === "user" ? "on" : ""} onClick={() => setView("user")}>
+            Traveler View
+          </button>
+          <button className={view === "judge" ? "on" : ""} onClick={() => setView("judge")}>
+            Judge / Developer View
+          </button>
+        </div>
       </header>
 
       <div className="plan-surface">
@@ -188,11 +201,58 @@ export default function App() {
         <div className="ack-banner">{acknowledged}</div>
       )}
 
-      <main className="deck">
-        <TwinPanel profile={profile} twinLog={twinLog} onSteer={steerWeights} />
-        <ReasoningPanel result={result} loading={loading} error={error} airports={airports} />
-        <VerdictPanel result={result} onFeedback={sendFeedback} />
-      </main>
+      {loading && <div className="stage-status">Planning your trip…</div>}
+      {error && !loading && <div className="stage-status error">{error}</div>}
+
+      {!loading && !error && result?.recommendation?.feasible && view === "user" && (
+        <main className="story">
+          <JourneySummary result={result} />
+
+          {result.narrative && (
+            <section className="companion-note">
+              <h3 className="eyebrow">Your AI companion</h3>
+              <p>{result.narrative.startsWith("###")
+                ? result.explanation.headline : result.narrative}</p>
+            </section>
+          )}
+
+          <VerdictPanel result={result} onFeedback={sendFeedback} embedded />
+
+          {result.recommendation.top && (
+            <section className="story-map">
+              <h3 className="eyebrow">Your route</h3>
+              <RouteMap legs={result.recommendation.top.legs} airports={airports} />
+            </section>
+          )}
+
+          <TwinSummary profile={profile} />
+        </main>
+      )}
+
+      {!loading && !error && result && view === "user"
+        && !result.recommendation?.feasible && (
+        <main className="story">
+          <JourneySummary result={result} />
+          <section className="companion-note">
+            <p>{result.explanation?.headline || "No itinerary matched — try widening the dates."}</p>
+          </section>
+        </main>
+      )}
+
+      {view === "judge" && (
+        <main className="judge">
+          {result && <PipelineStrip result={result} />}
+          <div className="deck">
+            <TwinPanel profile={profile} twinLog={twinLog} onSteer={steerWeights} />
+            <ReasoningPanel result={result} loading={loading} error={error} airports={airports} />
+            <VerdictPanel result={result} onFeedback={sendFeedback} />
+          </div>
+        </main>
+      )}
+
+      {!result && !loading && view === "user" && (
+        <div className="stage-status">Pick a traveler and describe your trip to begin.</div>
+      )}
     </>
   );
 }
