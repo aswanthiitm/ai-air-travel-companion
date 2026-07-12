@@ -4,6 +4,63 @@ function fmtMin(m) {
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}m`;
 }
 
+// --- Traveler-facing copy, built from structured data (no engine jargon) ----
+
+function friendlyHighlights(result) {
+  const { recommendation: rec, profile } = result;
+  const top = rec.top;
+  const legs = top.legs;
+  const pref = profile?.soft?.airlines || [];
+  const usedPref = [...new Set(legs.map((l) => l.airline_code))].filter((a) => pref.includes(a));
+  const cabins = [...new Set(legs.map((l) => l.cabin_class))];
+  const names = [...new Set(legs.map((l) => l.airline_name))];
+  const out = [];
+
+  if (top.max_stops === 0) out.push("Non-stop the whole way — no connections to worry about");
+  else out.push(`Just ${top.max_stops} short stop${top.max_stops > 1 ? "s" : ""}, chosen to keep the price down`);
+
+  if (usedPref.length) {
+    const pretty = usedPref.map((c) => names.find((n) => n) || c);
+    out.push(`Flies ${usedPref.join(" & ")} — ${usedPref.length > 1 ? "airlines" : "an airline"} you like`);
+  }
+  if (cabins.length === 1 && (cabins[0] === "Business" || cabins[0] === "First"))
+    out.push(`${cabins[0]}-class comfort on every leg`);
+  if (profile?.soft?.redeye_policy === "avoid" && !legs.some((l) => l.is_redeye))
+    out.push("No overnight flights — you arrive rested");
+  if ((profile?.soft?.checked_bags || 0) > 0 && legs.every((l) => l.baggage_included))
+    out.push("Checked bags included on every flight");
+
+  const cheapest = rec.ranked.reduce((a, b) => (b.total_price < a.total_price ? b : a), rec.ranked[0]);
+  if (cheapest && cheapest.flight_ids.join() === top.flight_ids.join())
+    out.push("The best-value fare we could find for you");
+
+  const vot = profile?.flexibility?.value_of_time_usd_per_hr;
+  if (vot && out.length < 5)
+    out.push("Balances price and travel time the way you usually do");
+
+  return out.slice(0, 5);
+}
+
+function friendlyInsights(result) {
+  const anns = result.recommendation.top?.annotations || [];
+  if (!anns.length) return [];
+  const out = [];
+  const seats = Math.min(...anns.map((a) => a.seats_available));
+  if (seats <= 3)
+    out.push({ tone: "urgent", text: `Only ${seats} seat${seats > 1 ? "s" : ""} left at this price — worth booking soon.` });
+
+  const holiday = anns.some((a) => a.is_holiday_season);
+  const uplift = Math.max(...anns.map((a) => a.seasonal_uplift ?? 0));
+  const dip = Math.min(...anns.map((a) => a.seasonal_uplift ?? 0));
+  if (holiday)
+    out.push({ tone: "info", text: "You're travelling in peak season, so fares run higher than usual — but this is a strong pick for these dates." });
+  else if (uplift >= 0.15)
+    out.push({ tone: "info", text: "Prices this time of year are a little above average, so locking this in now is smart." });
+  else if (dip <= -0.1)
+    out.push({ tone: "good", text: "Good timing — you're travelling off-peak, so fares are lower than usual." });
+  return out;
+}
+
 function Legs({ legs }) {
   return (
     <div className="pass-legs">
@@ -152,26 +209,50 @@ export default function VerdictPanel({ result, onFeedback, embedded }) {
         />
       ))}
 
-      <h3>Why this pick</h3>
-      <ul className="note-list section-list">
-        {expl.why_top.map((w, i) => <li key={i}>{w}</li>)}
-      </ul>
-
-      {expl.market_context.length > 0 && (
+      {embedded ? (
         <>
-          <h3>Market context</h3>
-          <ul className="note-list section-list">
-            {expl.market_context.map((m, i) => <li key={i}>{m}</li>)}
+          <h3 className="eyebrow" style={{ marginTop: 18 }}>Why we picked this for you</h3>
+          <ul className="highlight-list">
+            {friendlyHighlights(result).map((h, i) => (
+              <li key={i}><span className="hl-check">✓</span>{h}</li>
+            ))}
           </ul>
+
+          {friendlyInsights(result).length > 0 && (
+            <>
+              <h3 className="eyebrow" style={{ marginTop: 18 }}>Good to know</h3>
+              <div className="insight-list">
+                {friendlyInsights(result).map((ins, i) => (
+                  <div className={`insight ${ins.tone}`} key={i}>{ins.text}</div>
+                ))}
+              </div>
+            </>
+          )}
         </>
-      )}
-
-      {expl.caveats.length > 0 && (
+      ) : (
         <>
-          <h3>Fine print</h3>
+          <h3>Why this pick</h3>
           <ul className="note-list section-list">
-            {expl.caveats.map((c, i) => <li key={i}>{c}</li>)}
+            {expl.why_top.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
+
+          {expl.market_context.length > 0 && (
+            <>
+              <h3>Market context</h3>
+              <ul className="note-list section-list">
+                {expl.market_context.map((m, i) => <li key={i}>{m}</li>)}
+              </ul>
+            </>
+          )}
+
+          {expl.caveats.length > 0 && (
+            <>
+              <h3>Fine print</h3>
+              <ul className="note-list section-list">
+                {expl.caveats.map((c, i) => <li key={i}>{c}</li>)}
+              </ul>
+            </>
+          )}
         </>
       )}
     </Wrap>

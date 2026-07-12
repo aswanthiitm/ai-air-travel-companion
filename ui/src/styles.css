@@ -331,6 +331,22 @@ body {
 .companion-note { background: var(--accent-soft); border-radius: 12px; padding: 16px 20px; }
 .companion-note p { font-family: var(--serif); font-size: 16px; line-height: 1.55; }
 
+/* Friendly, benefit-led "why" for the Traveler view (green-check list) */
+.highlight-list { list-style: none; display: flex; flex-direction: column; gap: 9px;
+  margin-top: 4px; }
+.highlight-list li { display: flex; align-items: flex-start; gap: 10px;
+  font-size: 15px; color: var(--ink); line-height: 1.4; }
+.hl-check { flex: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--good); color: #fff; font-size: 12px; display: inline-flex;
+  align-items: center; justify-content: center; margin-top: 1px; }
+
+.insight-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.insight { font-size: 14px; line-height: 1.45; padding: 11px 14px; border-radius: 10px;
+  border-left: 3px solid var(--line); background: var(--paper-raised); }
+.insight.urgent { border-left-color: var(--accent); background: var(--accent-soft); }
+.insight.info { border-left-color: var(--warn); }
+.insight.good { border-left-color: var(--good); }
+
 .verdict-embedded { display: block; }
 .verdict-embedded h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--ink-soft); margin: 16px 0 6px; }
