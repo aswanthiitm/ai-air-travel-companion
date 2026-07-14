@@ -1,0 +1,22 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8010:8010"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - TWIN_LLM_MODEL=${TWIN_LLM_MODEL:-}
+    volumes:
+      - twin-data:/app/data
+
+  ui:
+    build: ./ui
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  twin-data:

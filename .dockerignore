@@ -1,0 +1,14 @@
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+tests
+notebooks
+docs
+ui
+.git
+.github
+.claude
+data/twin.db
+*.md

@@ -1,5 +1,8 @@
 # Traveler Twin — AI Air Travel Companion
 
+[![CI](https://github.com/aswanthiitm/ai-air-travel-companion/actions/workflows/ci.yml/badge.svg)](https://github.com/aswanthiitm/ai-air-travel-companion/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > **Intelligent Travel, Tailored to Every Traveler**
 > A glass-box digital twin of each traveler that negotiates flight trade-offs
 > on their behalf — and shows its work.
@@ -7,6 +10,16 @@
 Built for the **Expedia Group Innovation Hackathon** (Problem Statement 1:
 AI Air Travel Companion). See [docs/SOLUTION_SUMMARY.md](docs/SOLUTION_SUMMARY.md)
 for the submission-facing problem/solution/impact summary.
+
+## Screenshots
+
+**Traveler View** — plain-language recommendation, named alternatives, and a route map:
+
+![Traveler View](docs/screenshots/traveler-view.png)
+
+**Judge / Developer View** — the same result through the engine's eyes: Traveler DNA dial, reasoning funnel, agent trace, and the honest concession log:
+
+![Judge / Developer View](docs/screenshots/judge-view.png)
 
 ## The idea
 
@@ -42,12 +55,29 @@ src/           Deterministic Python backend
   data_loader.py       Typed CSV/JSON loaders
   preprocessing.py     Enrichment, route indices, seasonal stats, validation
 ui/            React flight-deck (Vite): Twin / Reasoning / Verdict panels
-docs/          Architecture and design documentation
+docs/          Architecture, deployment, and design documentation
 notebooks/     Exploration notebooks
 tests/         Pytest suite — dataset invariants + module contracts
+Dockerfile              Backend API container
+ui/Dockerfile           Frontend container (Vite build + nginx)
+docker-compose.yml      Runs both services together
+.github/workflows/      CI: pytest + UI build on every push/PR
 ```
 
-## Setup
+## Quickstart
+
+**Docker (fastest — one command, both services):**
+
+```bash
+docker compose up --build
+# API   -> http://localhost:8010
+# UI    -> http://localhost:8080
+```
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for deploying this to a real
+host (Render/Railway/Fly for the API, GitHub Pages/Netlify/Vercel for the UI).
+
+**Manual (two terminals):**
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -56,13 +86,13 @@ pytest                              # dataset invariants + module contracts
 python -m src.evaluation            # run all 6 benchmark prompts end-to-end
 python -m src.evaluation --report   # + regenerate docs/BENCHMARKS.md
 
-# the app (API + flight-deck UI)
-python3 -m uvicorn src.api:app --port 8010
-cd ui && npm install && npm run dev            # http://localhost:5173
+python3 -m uvicorn src.api:app --port 8010     # terminal 1: backend API
+cd ui && npm install && npm run dev            # terminal 2: frontend on :5173
 
 # optional agent mode: LLM understanding + composed replies.
-# Either provider works; without a key the deterministic fallback handles
-# everything (all benchmarks + tests are offline).
+# copy .env.example -> .env and set one provider key. Without a key the
+# deterministic fallback handles everything (all benchmarks + tests are
+# offline).
 export GROQ_API_KEY=...          # Groq (llama-3.3-70b-versatile), or
 export CEREBRAS_API_KEY=...      # Cerebras (gpt-oss-120b, ~2-6s turns), or
 export OPENROUTER_API_KEY=...    # OpenRouter (default: tencent/hy3:free)
@@ -72,13 +102,6 @@ export TWIN_LLM_MODEL=...        # optional model override
 
 Requires Python 3.10+. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the
 full benchmark output with per-prompt rubric self-checks.
-
-### Run the flight-deck UI
-
-```bash
-python3 -m uvicorn src.api:app --port 8010     # backend API
-cd ui && npm install && npm run dev            # frontend on :5173 (proxies /api)
-```
 
 Pick a traveler, fill in as much or as little of the form as you like, and
 add a free-text note (or click a benchmark chip). The app opens in
@@ -135,3 +158,7 @@ Documented as they are made (hackathon FAQ #6):
 
 Tracked in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); updated as
 milestones land.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

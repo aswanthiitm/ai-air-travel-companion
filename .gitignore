@@ -13,6 +13,10 @@ ui/dist/
 .DS_Store
 .idea/
 .vscode/
+.claude/
+
+# Environment
+.env
 
 # Notebooks
 .ipynb_checkpoints/
