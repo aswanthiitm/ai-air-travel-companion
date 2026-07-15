@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://ai-air-travel-companion.onrender.com/api/:path*"
+    }
+  ]
+}
