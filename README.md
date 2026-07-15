@@ -15,6 +15,10 @@ for the submission-facing problem/solution/impact summary.
 (UI on Vercel, API on Render's free tier — the first request after a period
 of inactivity can take ~30-50s to wake the API up)
 
+## Demo
+
+![Demo: submitting a request and watching the Traveler Twin reason through it](docs/screenshots/demo.gif)
+
 ## Screenshots
 
 **Traveler View** — plain-language recommendation, named alternatives, and a route map:
