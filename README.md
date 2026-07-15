@@ -11,6 +11,10 @@ Built for the **Expedia Group Innovation Hackathon** (Problem Statement 1:
 AI Air Travel Companion). See [docs/SOLUTION_SUMMARY.md](docs/SOLUTION_SUMMARY.md)
 for the submission-facing problem/solution/impact summary.
 
+**Live demo: [ai-air-travel-companion.vercel.app](https://ai-air-travel-companion.vercel.app)**
+(UI on Vercel, API on Render's free tier — the first request after a period
+of inactivity can take ~30-50s to wake the API up)
+
 ## Screenshots
 
 **Traveler View** — plain-language recommendation, named alternatives, and a route map:
