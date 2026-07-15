@@ -26,3 +26,6 @@ ui/dist/
 
 # Twin store (runtime state)
 data/twin.db
+
+# Personal notes (not project content)
+interview-notes.pdf
